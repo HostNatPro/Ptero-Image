@@ -64,4 +64,4 @@ if [ -d "$images_dir" ]; then
   done
 fi
 
-jq -n --argjson inc "$matrix" '{include: $inc}'
+jq -c -n --argjson inc "$matrix" '{include: $inc}'

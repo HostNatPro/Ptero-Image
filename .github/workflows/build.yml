@@ -32,7 +32,9 @@ jobs:
           else
             MATRIX_JSON=$(bash .github/scripts/generate-matrix.sh)
           fi
-          echo "matrix=${MATRIX_JSON}" >> $GITHUB_OUTPUT
+          echo "matrix<<EOF" >> $GITHUB_OUTPUT
+          echo "$MATRIX_JSON" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
 
   build:
     needs: setup
