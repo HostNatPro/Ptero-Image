@@ -1,0 +1,5 @@
+{
+  "versions": ["20", "21", "22", "23", "24"],
+  "platforms": ["linux/amd64", "linux/arm64"],
+  "latest_version": "22"
+}

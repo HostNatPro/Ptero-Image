@@ -1,0 +1,86 @@
+name: Build and Push Pterodactyl Images
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'images/**'
+      - '.github/workflows/build.yml'
+      - '.github/scripts/**'
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Generate Matrix
+        id: set-matrix
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            MATRIX_JSON=$(bash .github/scripts/generate-matrix.sh --all)
+          else
+            MATRIX_JSON=$(bash .github/scripts/generate-matrix.sh)
+          fi
+          echo "matrix=${MATRIX_JSON}" >> $GITHUB_OUTPUT
+
+  build:
+    needs: setup
+    runs-on: ubuntu-latest
+    if: ${{ needs.setup.outputs.matrix != '' && toJson(fromJSON(needs.setup.outputs.matrix).include) != '[]' }}
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.setup.outputs.matrix) }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to the Container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ github.repository }}/${{ matrix.image }}
+          tags: |
+            type=raw,value=${{ matrix.version }}
+            type=raw,value=latest,enable=${{ matrix.latest }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./images/${{ matrix.image }}
+          file: ./images/${{ matrix.image }}/Dockerfile
+          build-args: |
+            VERSION=${{ matrix.version }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          platforms: ${{ matrix.platforms }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
